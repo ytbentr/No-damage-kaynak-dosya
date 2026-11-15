@@ -114,8 +114,7 @@ public final class TabHidePlugin extends JavaPlugin implements Listener {
         if (colon >= 0 && hostname.indexOf(':') == colon) {
             hostname = hostname.substring(0, colon);
         }
-        boolean botgdlAddress = hostname.equals("5.9.41.143")
-                || hostname.equals("bensmpmc.duckdns.org");
+        boolean botgdlAddress = hostname.equals("gold.magmanode.com");
 
         // Gerçek Botgdl zaten çevrimiçiyse ikinci kez sayma.
         Player realBot = Bukkit.getPlayerExact("Botgdl");
