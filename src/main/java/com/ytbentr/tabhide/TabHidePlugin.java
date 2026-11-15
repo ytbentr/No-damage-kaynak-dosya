@@ -9,7 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.server.ServerListPingEvent;
+import com.destroystokyo.paper.event.server.PaperServerListPingEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Set;
@@ -93,7 +93,7 @@ public final class TabHidePlugin extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-    public void onServerListPing(ServerListPingEvent event) {
+    public void onServerListPing(PaperServerListPingEvent event) {
         long hiddenOnline = Bukkit.getOnlinePlayers().stream()
                 .filter(player -> vanished.contains(player.getUniqueId())).count();
         event.setNumPlayers(Math.max(0, event.getNumPlayers() - (int) hiddenOnline));
