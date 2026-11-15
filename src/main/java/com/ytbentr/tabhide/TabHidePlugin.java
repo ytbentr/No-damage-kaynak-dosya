@@ -97,6 +97,8 @@ public final class TabHidePlugin extends JavaPlugin implements Listener {
         long hiddenOnline = Bukkit.getOnlinePlayers().stream()
                 .filter(player -> vanished.contains(player.getUniqueId())).count();
         event.setNumPlayers(Math.max(0, event.getNumPlayers() - (int) hiddenOnline));
+        // Sunucu listesinde fareyle oyuncu sayisinin uzerine gelince gizli oyuncular da gorunmesin.
+        event.getListedPlayers().removeIf(info -> vanished.contains(info.id()));
     }
 
     @Override
