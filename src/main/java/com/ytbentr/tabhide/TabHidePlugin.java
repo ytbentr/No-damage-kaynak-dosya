@@ -104,7 +104,20 @@ public final class TabHidePlugin extends JavaPlugin implements Listener {
         // Gizli oyuncuları gerçek sayımdan çıkar.
         int visiblePlayers = Math.max(0, event.getNumPlayers() - (int) hiddenOnline);
 
-        // Botgdl yalnızca sunucu listesindeki ping yanıtında gösterilir.
+        // Botgdl yalnızca oyuncuların kullandığı iki adreste gösterilir.
+        String hostname = event.getHostname().trim().toLowerCase(java.util.Locale.ROOT);
+        if (hostname.endsWith(".")) {
+            hostname = hostname.substring(0, hostname.length() - 1);
+        }
+        // Ping hostname'i portla geldiyse portu ayır.
+        int colon = hostname.lastIndexOf(':');
+        if (colon >= 0 && hostname.indexOf(':') == colon) {
+            hostname = hostname.substring(0, colon);
+        }
+        boolean botgdlAddress = hostname.equals("5.9.41.143")
+                || hostname.equals("bensmpmc.duckdns.org");
+
+        // Gerçek Botgdl zaten çevrimiçiyse ikinci kez sayma.
         Player realBot = Bukkit.getPlayerExact("Botgdl");
         boolean realBotAlreadyVisible = realBot != null
                 && !vanished.contains(realBot.getUniqueId());
@@ -115,10 +128,11 @@ public final class TabHidePlugin extends JavaPlugin implements Listener {
             event.getListedPlayers().removeIf(info -> vanished.contains(info.id()));
         }
 
-        if (!realBotAlreadyVisible) {
+        if (botgdlAddress && !realBotAlreadyVisible) {
             UUID botId = UUID.nameUUIDFromBytes(
                     "OfflinePlayer:Botgdl".getBytes(StandardCharsets.UTF_8));
-            event.getListedPlayers().add(Bukkit.createPlayerProfile(botId, "Botgdl"));
+            event.getListedPlayers().add(
+                    new PaperServerListPingEvent.ListedPlayerInfo("Botgdl", botId));
             visiblePlayers++;
         }
 
