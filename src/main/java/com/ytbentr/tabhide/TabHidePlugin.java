@@ -5,6 +5,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -58,12 +59,15 @@ public final class TabHidePlugin extends JavaPlugin implements Listener {
     }
 
     private void applyVanish(Player target) {
+        // TAB gibi eklentilerin standart Bukkit vanish metadata'si üzerinden algılamasını sağlar.
+        target.setMetadata("vanished", new FixedMetadataValue(this, true));
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             if (!viewer.equals(target)) viewer.hidePlayer(this, target);
         }
     }
 
     private void removeVanish(Player target) {
+        target.removeMetadata("vanished", this);
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             if (!viewer.equals(target)) viewer.showPlayer(this, target);
         }
@@ -97,8 +101,12 @@ public final class TabHidePlugin extends JavaPlugin implements Listener {
         long hiddenOnline = Bukkit.getOnlinePlayers().stream()
                 .filter(player -> vanished.contains(player.getUniqueId())).count();
         event.setNumPlayers(Math.max(0, event.getNumPlayers() - (int) hiddenOnline));
-        // Sunucu listesinde fareyle oyuncu sayisinin uzerine gelince gizli oyuncular da gorunmesin.
-        event.getListedPlayers().removeIf(info -> vanished.contains(info.id()));
+        // İstemciye boş/anonim oyuncu örnekleri gönderilmesini önle.
+        if (hiddenOnline > 0) {
+            event.getListedPlayers().clear();
+        } else {
+            event.getListedPlayers().removeIf(info -> vanished.contains(info.id()));
+        }
     }
 
     @Override
