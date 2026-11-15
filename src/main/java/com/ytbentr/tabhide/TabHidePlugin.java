@@ -15,6 +15,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.Set;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class TabHidePlugin extends JavaPlugin implements Listener {
@@ -100,13 +101,28 @@ public final class TabHidePlugin extends JavaPlugin implements Listener {
     public void onServerListPing(PaperServerListPingEvent event) {
         long hiddenOnline = Bukkit.getOnlinePlayers().stream()
                 .filter(player -> vanished.contains(player.getUniqueId())).count();
-        event.setNumPlayers(Math.max(0, event.getNumPlayers() - (int) hiddenOnline));
-        // İstemciye boş/anonim oyuncu örnekleri gönderilmesini önle.
+        // Gizli oyuncuları gerçek sayımdan çıkar.
+        int visiblePlayers = Math.max(0, event.getNumPlayers() - (int) hiddenOnline);
+
+        // Botgdl yalnızca sunucu listesindeki ping yanıtında gösterilir.
+        Player realBot = Bukkit.getPlayerExact("Botgdl");
+        boolean realBotAlreadyVisible = realBot != null
+                && !vanished.contains(realBot.getUniqueId());
+
         if (hiddenOnline > 0) {
             event.getListedPlayers().clear();
         } else {
             event.getListedPlayers().removeIf(info -> vanished.contains(info.id()));
         }
+
+        if (!realBotAlreadyVisible) {
+            UUID botId = UUID.nameUUIDFromBytes(
+                    "OfflinePlayer:Botgdl".getBytes(StandardCharsets.UTF_8));
+            event.getListedPlayers().add(Bukkit.createPlayerProfile(botId, "Botgdl"));
+            visiblePlayers++;
+        }
+
+        event.setNumPlayers(visiblePlayers);
     }
 
     @Override
