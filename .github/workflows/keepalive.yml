@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Check Botgdl3 Web Service
         env:
-          SERVICE_URL: \${{ secrets.BOTGDL3_SERVICE_URL }}
+          SERVICE_URL: ${{ secrets.BOTGDL3_SERVICE_URL }}
         run: |
           if [ -z "$SERVICE_URL" ]; then
             echo "Set the BOTGDL3_SERVICE_URL repository secret."
