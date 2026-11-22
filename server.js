@@ -27,6 +27,9 @@ const REGISTER_COMMAND = "/register";
 const TP_COMMAND = "/tp 93.71 -61 45.32";
 const GAMEMODE_COMMAND = "/gamemode creative";
 
+const JUMP_INTERVAL = 2000;
+const JUMP_DURATION = 300;
+
 const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 
@@ -69,6 +72,9 @@ let botOnline = false;
 let botConnecting = false;
 let botStopping = false;
 let reconnectTimer = null;
+
+let jumpTimer = null;
+let jumpTimeout = null;
 
 let authCompleted = false;
 let authStarted = false;
@@ -129,8 +135,8 @@ async function resolveServer() {
         port: records[0].port
       };
     }
-  } catch (error) {
-    console.log("[DNS] SRV kaydı bulunamadı, varsayılan adres kullanılacak.");
+  } catch {
+    console.log("[DNS] SRV bulunamadı, varsayılan adres kullanılacak.");
   }
 
   return {
@@ -141,7 +147,7 @@ async function resolveServer() {
 
 function sendCommand(command) {
   if (!bot || !botOnline) {
-    console.log("[BOT] Komut gönderilemedi: Bot çevrimdışı.");
+    console.log("[BOT] Komut gönderilemedi: çevrimdışı.");
     return false;
   }
 
@@ -153,6 +159,50 @@ function sendCommand(command) {
 
   bot.chat(command);
   return true;
+}
+
+// Otomatik zıplama
+function startJumping() {
+  if (jumpTimer || !bot || !botOnline || !authCompleted) return;
+
+  console.log("[JUMP] Otomatik zıplama başladı.");
+
+  jumpTimer = setInterval(() => {
+    if (!bot || !botOnline || !authCompleted) {
+      stopJumping();
+      return;
+    }
+
+    if (bot.entity && bot.entity.onGround) {
+      bot.setControlState("jump", true);
+
+      if (jumpTimeout) clearTimeout(jumpTimeout);
+
+      jumpTimeout = setTimeout(() => {
+        if (bot && botOnline) {
+          bot.setControlState("jump", false);
+        }
+      }, JUMP_DURATION);
+    }
+  }, JUMP_INTERVAL);
+}
+
+function stopJumping() {
+  if (jumpTimer) {
+    clearInterval(jumpTimer);
+    jumpTimer = null;
+  }
+
+  if (jumpTimeout) {
+    clearTimeout(jumpTimeout);
+    jumpTimeout = null;
+  }
+
+  if (bot) {
+    bot.setControlState("jump", false);
+  }
+
+  console.log("[JUMP] Zıplama durduruldu.");
 }
 
 function runAfterLogin() {
@@ -172,8 +222,10 @@ function runAfterLogin() {
 
       updateState(
         "online",
-        "Giriş tamamlandı. TP ve Creative komutları gönderildi."
+        "Giriş tamamlandı. TP, Creative ve otomatik zıplama aktif."
       );
+
+      startJumping();
     }, 3000);
   }, 2000);
 }
@@ -219,7 +271,7 @@ function handleAuthMessage(message) {
 
     registerAttempted = true;
 
-    console.log("[AUTH] Hesap kayıtlı değil. Kayıt gönderiliyor.");
+    console.log("[AUTH] Kayıt gerekiyor.");
 
     setTimeout(() => {
       if (!botOnline || !bot || authCompleted) return;
@@ -237,7 +289,8 @@ function handleAuthMessage(message) {
     text.includes("successfully registered") ||
     text.includes("registration successful") ||
     text.includes("registered successfully") ||
-    text.includes("registered successfully!")
+    text.includes("başarıyla kayıt") ||
+    text.includes("kayıt başarılı")
   ) {
     console.log("[AUTH] Kayıt başarılı.");
 
@@ -256,7 +309,9 @@ function handleAuthMessage(message) {
     text.includes("successfully logged") ||
     text.includes("logged in") ||
     text.includes("authenticated") ||
-    text.includes("login successful")
+    text.includes("login successful") ||
+    text.includes("giriş başarılı") ||
+    text.includes("başarıyla giriş")
   ) {
     authCompleted = true;
 
@@ -272,7 +327,8 @@ function handleAuthMessage(message) {
   if (
     text.includes("wrong password") ||
     text.includes("incorrect password") ||
-    text.includes("invalid password")
+    text.includes("invalid password") ||
+    text.includes("yanlış şifre")
   ) {
     updateState("auth-error", "AuthMe şifreyi kabul etmedi.");
     return;
@@ -313,6 +369,8 @@ async function startBot() {
   authStarted = false;
   registerAttempted = false;
   actionCompleted = false;
+
+  stopJumping();
 
   const generation = ++connectionGeneration;
 
@@ -358,7 +416,6 @@ async function startBot() {
       beginAuthentication();
     });
 
-    // Tek mesaj dinleyicisi: çift işlemeyi önler.
     newBot.on("message", (message) => {
       if (generation !== connectionGeneration) return;
 
@@ -389,6 +446,8 @@ async function startBot() {
       if (generation !== connectionGeneration) return;
 
       console.log("[BOT] Bağlantı kapandı:", reason);
+
+      stopJumping();
 
       botOnline = false;
       botConnecting = false;
@@ -421,6 +480,8 @@ function stopBot() {
     reconnectTimer = null;
   }
 
+  stopJumping();
+
   if (bot) {
     bot.quit("Bot durduruldu.");
     bot = null;
@@ -445,7 +506,8 @@ app.get("/api/status", (req, res) => {
   res.json({
     ...state,
     online: botOnline,
-    authenticated: authCompleted
+    authenticated: authCompleted,
+    jumping: Boolean(jumpTimer)
   });
 });
 
