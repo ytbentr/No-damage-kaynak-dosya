@@ -8,6 +8,7 @@ const net=require("node:net");
 const fs=require("node:fs");
 const path=require("node:path");
 const app=express(),PORT=Number(process.env.PORT||3000);
+if(process.env.NODE_ENV==="production"&&!process.env.SESSION_SECRET)throw Error("SESSION_SECRET environment variable is required in production.");
 const dataDir=path.join(__dirname,"data"),usersFile=path.join(dataDir,"users.json");
 fs.mkdirSync(dataDir,{recursive:true});
 if(!fs.existsSync(usersFile))fs.writeFileSync(usersFile,"[]");
@@ -25,7 +26,7 @@ async function resolveServer(){
  if(!host||host==="your-voltra-server-address")throw Error("Render Environment bölümünde MC_HOST ayarlanmamış.");
  if(process.env.MC_PORT){const port=Number(process.env.MC_PORT);if(!Number.isInteger(port)||port<1||port>65535)throw Error("MC_PORT geçerli değil.");return{host,port};}
  if(net.isIP(host))return{host,port:25565};
- try{const records=await dns.resolveSrv("_minecraft._tcp."+host);if(records.length){records.sort((a,b)=>a.priority-b.priority||b.weight-a.weight);return{host:records[0].name.replace(/\\.$/,""),port:records[0].port}}}catch{}
+ try{const records=await dns.resolveSrv("_minecraft._tcp."+host);if(records.length){records.sort((a,b)=>a.priority-b.priority||b.weight-a.weight);return{host:records[0].name.replace(/\.$/,""),port:records[0].port}}}catch{}
  return{host,port:25565};
 }
 function retry(){if(stopRequested||timer)return;timer=setTimeout(()=>{timer=null;startBot().catch(()=>{})},10000)}
