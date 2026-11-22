@@ -43,7 +43,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "change-this-secret",
+    secret: process.env.SESSION_SECRET || "change-this-session-secret",
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -129,7 +129,9 @@ async function resolveServer() {
         port: records[0].port
       };
     }
-  } catch {}
+  } catch (error) {
+    console.log("[DNS] SRV kaydı bulunamadı, varsayılan adres kullanılacak.");
+  }
 
   return {
     host: MC_HOST,
@@ -139,13 +141,17 @@ async function resolveServer() {
 
 function sendCommand(command) {
   if (!bot || !botOnline) {
-    console.log("[BOT] Komut gönderilemedi: çevrimdışı.");
+    console.log("[BOT] Komut gönderilemedi: Bot çevrimdışı.");
     return false;
   }
 
-  console.log("[BOT] Komut gönderiliyor:", command);
-  bot.chat(command);
+  console.log(
+    "[BOT] Komut gönderiliyor:",
+    command.split(" ")[0],
+    "********"
+  );
 
+  bot.chat(command);
   return true;
 }
 
@@ -166,7 +172,7 @@ function runAfterLogin() {
 
       updateState(
         "online",
-        "AuthMe tamamlandı. TP ve Creative komutları gönderildi."
+        "Giriş tamamlandı. TP ve Creative komutları gönderildi."
       );
     }, 3000);
   }, 2000);
@@ -180,7 +186,7 @@ function beginAuthentication() {
   if (!MC_PASSWORD || !MC_REGISTER_PASSWORD) {
     updateState(
       "auth-error",
-      "MC_PASSWORD veya MC_REGISTER_PASSWORD eksik."
+      "Render MC_PASSWORD veya MC_REGISTER_PASSWORD eksik."
     );
     return;
   }
@@ -200,17 +206,20 @@ function handleAuthMessage(message) {
 
   console.log("[AUTH CHAT]", raw);
 
-  // Kayıt gerektiren mesaj
-  if (
-    /not registered|please register|register using|register first|kayıt ol|kayıtlı değilsiniz|kayıt olmalısınız/i.test(text)
-  ) {
-    if (!botOnline || !bot || authCompleted) return;
+  if (!botOnline || !bot || authCompleted) return;
 
+  // AuthMe kayıt istemi
+  if (
+    text.includes("please, register to the server") ||
+    text.includes("this user isn't registered") ||
+    text.includes("not registered") ||
+    text.includes("register first")
+  ) {
     if (registerAttempted) return;
 
     registerAttempted = true;
 
-    console.log("[AUTH] Kayıt gerekiyor.");
+    console.log("[AUTH] Hesap kayıtlı değil. Kayıt gönderiliyor.");
 
     setTimeout(() => {
       if (!botOnline || !bot || authCompleted) return;
@@ -218,14 +227,17 @@ function handleAuthMessage(message) {
       sendCommand(
         `${REGISTER_COMMAND} ${MC_REGISTER_PASSWORD} ${MC_REGISTER_PASSWORD}`
       );
-    }, 1500);
+    }, 1200);
 
     return;
   }
 
   // Kayıt başarılı
   if (
-    /successfully registered|registration successful|registered successfully|başarıyla kayıt|kayıt başarılı/i.test(text)
+    text.includes("successfully registered") ||
+    text.includes("registration successful") ||
+    text.includes("registered successfully") ||
+    text.includes("registered successfully!")
   ) {
     console.log("[AUTH] Kayıt başarılı.");
 
@@ -240,25 +252,42 @@ function handleAuthMessage(message) {
 
   // Giriş başarılı
   if (
-    /successfully logged in|successfully logged|logged in|authenticated|giriş başarılı|başarıyla giriş|giriş yaptınız/i.test(text)
+    text.includes("successfully logged in") ||
+    text.includes("successfully logged") ||
+    text.includes("logged in") ||
+    text.includes("authenticated") ||
+    text.includes("login successful")
   ) {
-    if (authCompleted) return;
-
     authCompleted = true;
 
-    console.log("[AUTH] Giriş başarılı.");
+    console.log("[AUTH] Giriş tamamlandı.");
 
-    updateState("authenticated", "AuthMe girişi tamamlandı.");
+    updateState("authenticated", "AuthMe girişi başarılı.");
 
     runAfterLogin();
     return;
   }
 
-  // Şifre hatası
+  // Şifre yanlış
   if (
-    /wrong password|incorrect password|invalid password|yanlış şifre/i.test(text)
+    text.includes("wrong password") ||
+    text.includes("incorrect password") ||
+    text.includes("invalid password")
   ) {
     updateState("auth-error", "AuthMe şifreyi kabul etmedi.");
+    return;
+  }
+
+  // Zaten giriş yapılmış
+  if (
+    text.includes("already logged in") ||
+    text.includes("already authenticated")
+  ) {
+    authCompleted = true;
+
+    updateState("authenticated", "Bot zaten giriş yapmış.");
+
+    runAfterLogin();
   }
 }
 
@@ -316,10 +345,7 @@ async function startBot() {
 
       botOnline = true;
 
-      updateState(
-        "online",
-        "Minecraft sunucusuna bağlantı kuruldu."
-      );
+      updateState("online", "Minecraft bağlantısı kuruldu.");
     });
 
     newBot.on("spawn", () => {
@@ -327,22 +353,12 @@ async function startBot() {
 
       botOnline = true;
 
-      updateState(
-        "spawned",
-        "Bot dünyaya girdi."
-      );
+      updateState("spawned", "Bot dünyaya girdi.");
 
       beginAuthentication();
     });
 
-    // Normal sohbet mesajları
-    newBot.on("messagestr", (message) => {
-      if (generation !== connectionGeneration) return;
-
-      handleAuthMessage(message);
-    });
-
-    // Sistem mesajları
+    // Tek mesaj dinleyicisi: çift işlemeyi önler.
     newBot.on("message", (message) => {
       if (generation !== connectionGeneration) return;
 
@@ -350,6 +366,8 @@ async function startBot() {
     });
 
     newBot.on("kicked", (reason) => {
+      if (generation !== connectionGeneration) return;
+
       const reasonText = cleanText(reason);
 
       state.lastError = reasonText;
@@ -376,10 +394,7 @@ async function startBot() {
       botConnecting = false;
       bot = null;
 
-      updateState(
-        "offline",
-        String(reason || "Bağlantı kesildi.")
-      );
+      updateState("offline", String(reason || "Bağlantı kesildi."));
 
       scheduleReconnect(generation);
     });
@@ -414,9 +429,10 @@ function stopBot() {
   botOnline = false;
   botConnecting = false;
 
-  updateState("offline", "Bot manuel durduruldu.");
+  updateState("offline", "Bot manuel olarak durduruldu.");
 }
 
+// Sağlık kontrolü
 app.get("/health", (req, res) => {
   res.json({
     ok: true,
@@ -424,6 +440,7 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Bot durumu
 app.get("/api/status", (req, res) => {
   res.json({
     ...state,
@@ -432,6 +449,7 @@ app.get("/api/status", (req, res) => {
   });
 });
 
+// Bot başlat
 app.post("/api/bot/start", (req, res) => {
   botStopping = false;
 
@@ -443,6 +461,7 @@ app.post("/api/bot/start", (req, res) => {
   });
 });
 
+// Bot durdur
 app.post("/api/bot/stop", (req, res) => {
   stopBot();
 
@@ -452,7 +471,7 @@ app.post("/api/bot/stop", (req, res) => {
   });
 });
 
-// Web paneli kayıt sistemi
+// Web paneli kayıt
 app.post("/api/register", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -492,6 +511,7 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
+// Web paneli giriş
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -523,6 +543,7 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+// Çıkış
 app.post("/api/logout", (req, res) => {
   req.session.destroy(() => {
     res.json({
@@ -531,6 +552,7 @@ app.post("/api/logout", (req, res) => {
   });
 });
 
+// Kullanıcı bilgisi
 app.get("/api/me", (req, res) => {
   if (!req.session.username) {
     return res.status(401).json({
@@ -544,6 +566,7 @@ app.get("/api/me", (req, res) => {
   });
 });
 
+// Ana sayfa
 app.get("*", (req, res) => {
   res.sendFile(
     path.join(__dirname, "public", "index.html")
