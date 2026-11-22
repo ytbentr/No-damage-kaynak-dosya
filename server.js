@@ -12,11 +12,8 @@ const path = require("node:path");
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 
-if (
-  process.env.NODE_ENV === "production" &&
-  !process.env.SESSION_SECRET
-) {
-  throw Error("SESSION_SECRET environment variable is required.");
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET gerekli.");
 }
 
 const dataDir = path.join(__dirname, "data");
@@ -66,6 +63,7 @@ const saveUsers = users => {
 
 const auth = (req, res, next) => {
   if (req.session.user) return next();
+
   return res.status(401).json({
     error: "Önce giriş yapmalısın."
   });
@@ -77,19 +75,30 @@ let message = "Bot başlatılıyor...";
 let timer = null;
 let stopRequested = false;
 let connecting = false;
+let generation = 0;
+
+function formatReason(reason) {
+  if (typeof reason === "string") return reason;
+
+  try {
+    return JSON.stringify(reason);
+  } catch {
+    return String(reason);
+  }
+}
 
 async function resolveServer() {
   const host = (process.env.MC_HOST || "").trim();
 
   if (!host || host === "your-voltra-server-address") {
-    throw Error("MC_HOST Render Environment bölümünde ayarlanmamış.");
+    throw new Error("MC_HOST ayarlanmamış.");
   }
 
   if (process.env.MC_PORT) {
     const port = Number(process.env.MC_PORT);
 
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      throw Error("MC_PORT geçerli değil.");
+      throw new Error("MC_PORT geçersiz.");
     }
 
     return { host, port };
@@ -113,7 +122,7 @@ async function resolveServer() {
       };
     }
   } catch (err) {
-    console.log("SRV kaydı bulunamadı, varsayılan port kullanılacak.");
+    console.log("SRV kaydı bulunamadı:", err.message);
   }
 
   return { host, port: 25565 };
@@ -124,6 +133,7 @@ function retry() {
 
   timer = setTimeout(() => {
     timer = null;
+
     startBot().catch(err => {
       console.error("Yeniden bağlantı hatası:", err.message);
     });
@@ -135,6 +145,9 @@ async function startBot() {
 
   connecting = true;
   stopRequested = false;
+
+  const currentGeneration = ++generation;
+
   state = "connecting";
   message = "Voltra sunucusuna bağlanılıyor...";
 
@@ -143,7 +156,7 @@ async function startBot() {
   try {
     const target = await resolveServer();
 
-    if (stopRequested) return;
+    if (stopRequested || currentGeneration !== generation) return;
 
     const options = {
       host: target.host,
@@ -159,18 +172,26 @@ async function startBot() {
       options.version = process.env.MC_VERSION;
     }
 
-    console.log("Minecraft hedefi:", target.host + ":" + target.port);
+    console.log(
+      "Minecraft hedefi:",
+      target.host + ":" + target.port
+    );
 
     const b = mineflayer.createBot(options);
     bot = b;
 
     b.once("login", () => {
+      if (bot !== b) return;
+
       state = "online";
       message = "Minecraft sunucusuna giriş yapıldı.";
+
       console.log(message);
     });
 
     b.once("spawn", () => {
+      if (bot !== b || stopRequested) return;
+
       state = "online";
       message = "Bot oyunda.";
 
@@ -180,7 +201,6 @@ async function startBot() {
         if (bot !== b || stopRequested) return;
 
         b.chat("/tp 93.71 -61 45.32");
-
         console.log("TP komutu gönderildi.");
 
         setTimeout(() => {
@@ -195,28 +215,35 @@ async function startBot() {
     });
 
     b.on("kicked", reason => {
-      message = "Sunucudan çıkarıldı: " +
-        String(reason).slice(0, 160);
+      const detail = formatReason(reason);
 
-      console.log(message);
+      message = "Sunucudan çıkarıldı: " + detail;
+
+      console.log("KICK REASON:", detail);
     });
 
     b.on("error", err => {
-      message = "Minecraft bağlantı hatası: " + err.message;
+      if (bot !== b) return;
+
       state = "error";
+      message = "Minecraft bağlantı hatası: " + err.message;
+
       console.error(message);
     });
 
-    b.once("end", () => {
+    b.once("end", reason => {
       if (bot === b) bot = null;
 
       connecting = false;
 
-      if (!stopRequested) {
+      if (!stopRequested && currentGeneration === generation) {
         state = "reconnecting";
+
         message = "Bağlantı kesildi. 10 saniye sonra tekrar denenecek.";
 
         console.log(message);
+        console.log("END REASON:", formatReason(reason));
+
         retry();
       } else {
         state = "stopped";
@@ -232,7 +259,6 @@ async function startBot() {
     console.error("Bot başlatma hatası:", err.message);
 
     retry();
-
     throw err;
 
   } finally {
@@ -242,6 +268,7 @@ async function startBot() {
 
 function stopBot() {
   stopRequested = true;
+  generation++;
 
   if (timer) {
     clearTimeout(timer);
@@ -387,7 +414,6 @@ app.get("*", (req, res) => {
   );
 });
 
-// SUNUCU BAŞLADIĞINDA BOTU OTOMATİK BAŞLAT
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Botgdl3 listening on " + PORT);
   console.log("Minecraft bot otomatik başlatılıyor...");
