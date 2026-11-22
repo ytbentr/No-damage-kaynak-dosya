@@ -1,0 +1,18 @@
+name: Botgdl3 scheduled health check
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Botgdl3 Web Service
+        env:
+          SERVICE_URL: \${{ secrets.BOTGDL3_SERVICE_URL }}
+        run: |
+          if [ -z "$SERVICE_URL" ]; then
+            echo "Set the BOTGDL3_SERVICE_URL repository secret."
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 30 "$SERVICE_URL/health"
