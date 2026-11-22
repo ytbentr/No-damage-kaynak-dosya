@@ -1,14 +1,34 @@
-<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Botgdl3</title><style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#0b1220;color:#edf2ff;font:15px system-ui;display:grid;place-items:center}.wrap{width:min(540px,calc(100% - 28px))}.brand{font-size:22px;font-weight:800;margin:0 0 20px}.card{background:#121d30;border:1px solid #293c58;border-radius:20px;padding:26px;box-shadow:0 20px 60px #0005}h1{margin:6px 0 10px}.muted,small{color:#91a2bd}.eyebrow{font-size:11px;letter-spacing:2px;color:#70adff;font-weight:800}label{display:grid;gap:7px;margin:15px 0;color:#bdcbe0}input{padding:13px;border-radius:10px;border:1px solid #354761;background:#0b1525;color:white;font:inherit}button{border:0;border-radius:10px;padding:12px 16px;font-weight:750;cursor:pointer}.primary{background:#3b82f6;color:white}.ghost{background:#263750;color:#e2eaff}.link{background:none;color:#80b8ff;padding:0}.hidden{display:none}.error{color:#fca5a5;min-height:18px;font-size:13px}.status{margin:22px 0;padding:16px;background:#0b1525;border-radius:12px}.actions{display:flex;gap:10px}.actions button{flex:1}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#fbbf24;margin-right:8px}.good{background:#34d399}.bad{background:#f87171}.foot{text-align:center;color:#72839f;font-size:12px;padding:18px}
-</style></head><body><main class="wrap"><div class="brand">⬡ Botgdl3 <small> / VOLTRA AFK</small></div><section id="auth" class="card"><p class="eyebrow">HESAP</p><h1 id="title">Tekrar hoş geldin</h1><p class="muted">Giriş yap veya yeni hesap oluştur.</p><form id="form"><label>Kullanıcı adı<input id="username" minlength="3" maxlength="20" required autocomplete="username"></label><label>Şifre<input id="password" type="password" minlength="8" maxlength="72" required autocomplete="current-password"></label><button id="submit" class="primary" type="submit">Giriş yap</button></form><p id="error" class="error"></p><p class="muted"><span id="switchText">Hesabın yok mu?</span> <button id="switch" class="link" type="button">Kayıt ol</button></p></section><section id="dash" class="card hidden"><div style="display:flex;justify-content:space-between"><div><p class="eyebrow">KONTROL MERKEZİ</p><h1>Bot durumu</h1><p class="muted">Merhaba, <b id="who"></b></p></div><button id="logout" class="ghost">Çıkış</button></div><div class="status"><span id="dot" class="dot"></span><b id="state">Kontrol ediliyor</b><p id="message" class="muted"></p></div><div class="actions"><button id="start" class="primary">Botu başlat</button><button id="stop" class="ghost">Botu durdur</button></div><p id="dashError" class="error"></p></section><div class="foot">Botgdl3 • Render Web Service</div></main><script>
-const $=id=>document.getElementById(id);let reg=false,poll;
-function dashboard(name){$("auth").classList.add("hidden");$("dash").classList.remove("hidden");$("who").textContent=name;refresh();clearInterval(poll);poll=setInterval(refresh,10000)}
-function authPage(){$("dash").classList.add("hidden");$("auth").classList.remove("hidden");clearInterval(poll)}
-$("switch").onclick=()=>{reg=!reg;$("title").textContent=reg?"Hesap oluştur":"Tekrar hoş geldin";$("submit").textContent=reg?"Kayıt ol":"Giriş yap";$("switchText").textContent=reg?"Zaten hesabın var mı?":"Hesabın yok mu?";$("switch").textContent=reg?"Giriş yap":"Kayıt ol";$("password").autocomplete=reg?"new-password":"current-password"};
-$("form").onsubmit=async e=>{e.preventDefault();$("error").textContent="";$("submit").disabled=true;try{const r=await fetch("/api/"+(reg?"register":"login"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:$("username").value,password:$("password").value})});const d=await r.json();if(!r.ok)throw Error(d.error);dashboard(d.username)}catch(x){$("error").textContent=x.message}finally{$("submit").disabled=false}};
-async function refresh(){try{const r=await fetch("/api/status");if(r.status===401)return authPage();const d=await r.json();$("state").textContent=({online:"Çevrimiçi",connecting:"Bağlanıyor",reconnecting:"Yeniden bağlanıyor",stopped:"Durduruldu",error:"Hata"})[d.state]||d.state;$("message").textContent=d.message;$("dot").className="dot "+(d.state==="online"?"good":d.state==="error"?"bad":"")}catch{$("dashError").textContent="Durum alınamadı."}}
-$("start").onclick=async()=>{const r=await fetch("/api/bot/start",{method:"POST"}),d=await r.json();$("dashError").textContent=r.ok?"":d.error;refresh()};
-$("stop").onclick=async()=>{await fetch("/api/bot/stop",{method:"POST"});refresh()};
-$("logout").onclick=async()=>{await fetch("/api/logout",{method:"POST"});authPage()};
-(async()=>{try{const r=await fetch("/api/me");if(r.ok){const d=await r.json();dashboard(d.username)}}catch{}})();
-</script></body></html>
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Botgdl3</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      color: #000000;
+      font-family: Arial, sans-serif;
+    }
+
+    p {
+      font-size: 18px;
+      font-weight: 400;
+    }
+  </style>
+</head>
+<body>
+  <p>Burası boş bir sayfa.</p>
+</body>
+</html>
